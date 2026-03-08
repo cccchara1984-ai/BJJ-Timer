@@ -193,6 +193,7 @@
 
     .home.layout-top-bottom::after {
       opacity: 1;
+      top: var(--home-layout-divider-y, 50%);
     }
 
     .undo-hint {
@@ -1838,7 +1839,8 @@
           lastY: 0,
           horizontalReady: false,
           pageEl: null,
-          previewing: false
+          previewing: false,
+          verticalLockActive: false
         },
         picker: {
           active: false,
@@ -1865,6 +1867,7 @@
       const infoPage = document.getElementById("infoPage");
       const timerMain = document.getElementById("timerMain");
       const timerStatus = document.getElementById("timerStatus");
+      const timerControls = document.querySelector(".controls");
       const timerFrame = document.getElementById("timerFrame");
       const timerHintDots = document.getElementById("timerHintDots");
       const homeModeSwipePreview = document.getElementById("homeModeSwipePreview");
@@ -1909,7 +1912,10 @@
         renderAll();
         bindScorePicker(bluePicker, "blue");
         bindScorePicker(whitePicker, "white");
-        window.addEventListener("resize", () => renderScoreArea());
+        window.addEventListener("resize", () => {
+          renderScoreArea();
+          updateHomeTopBottomDividerPosition();
+        });
         window.addEventListener("pointermove", onGlobalPickerMove);
         window.addEventListener("pointerup", onGlobalPickerEnd);
         window.addEventListener("pointercancel", onGlobalPickerEnd);
@@ -2449,6 +2455,7 @@
         // 仅当明确是“向右为主”的手势时，才进入可触发状态
         if (!state.pageSwipe.horizontalReady && dx > 18 && Math.abs(dx) > Math.abs(dy) * 1.25) {
           state.pageSwipe.horizontalReady = true;
+          lockSubPageVerticalScroll();
         }
         if (!state.pageSwipe.horizontalReady) return;
 
@@ -2482,6 +2489,18 @@
       function onSubPageSwipePointerCancel() {
         cancelSubPageSwipePreview();
         resetSubPageSwipeState();
+      }
+
+      function lockSubPageVerticalScroll() {
+        if (!state.pageSwipe.pageEl || state.pageSwipe.verticalLockActive) return;
+        state.pageSwipe.verticalLockActive = true;
+        state.pageSwipe.pageEl.style.overflowY = "hidden";
+      }
+
+      function unlockSubPageVerticalScroll() {
+        if (!state.pageSwipe.pageEl || !state.pageSwipe.verticalLockActive) return;
+        state.pageSwipe.verticalLockActive = false;
+        state.pageSwipe.pageEl.style.overflowY = "";
       }
 
       function updateSubPageSwipePreview(shiftX, progress) {
@@ -2554,6 +2573,7 @@
       }
 
       function resetSubPageSwipeState() {
+        unlockSubPageVerticalScroll();
         state.pageSwipe.active = false;
         state.pageSwipe.pointerId = null;
         state.pageSwipe.startX = 0;
@@ -2563,6 +2583,7 @@
         state.pageSwipe.horizontalReady = false;
         state.pageSwipe.pageEl = null;
         state.pageSwipe.previewing = false;
+        state.pageSwipe.verticalLockActive = false;
       }
 
       function isNoScoreTarget(target) {
@@ -3105,6 +3126,7 @@
         configPage.classList.toggle("hidden", page !== "config");
         infoPage.classList.toggle("hidden", page !== "info");
         if (page === "config") fillConfigForm();
+        if (page === "home") requestAnimationFrame(updateHomeTopBottomDividerPosition);
       }
 
       function renderAll() {
@@ -3114,6 +3136,7 @@
         renderTimerArea();
         renderModeAndLayoutText();
         renderBackgroundByLayout();
+        requestAnimationFrame(updateHomeTopBottomDividerPosition);
       }
 
       function renderScoreArea() {
@@ -3243,6 +3266,16 @@
       function renderBackgroundByLayout() {
         homePage.classList.toggle("layout-left-right", state.ui.layout === "left-right");
         homePage.classList.toggle("layout-top-bottom", state.ui.layout === "top-bottom");
+      }
+
+      function updateHomeTopBottomDividerPosition() {
+        if (!homePage || !timerStatus || !timerControls) return;
+        const homeRect = homePage.getBoundingClientRect();
+        const statusRect = timerStatus.getBoundingClientRect();
+        const controlsRect = timerControls.getBoundingClientRect();
+        if (!statusRect.height || !controlsRect.height) return;
+        const midY = ((statusRect.bottom + controlsRect.top) / 2) - homeRect.top - 4;
+        homePage.style.setProperty("--home-layout-divider-y", `${midY.toFixed(2)}px`);
       }
 
       function getTimerProgress() {
